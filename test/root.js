@@ -1,30 +1,41 @@
-global.expect = require('expect');
+global.expect = require("expect");
 
-const babel = require('babel-core');
-const jsdom = require('jsdom');
-const path = require('path');
+const babel = require("@babel/core");
+const { JSDOM } = require("jsdom");
+const path = require("path");
 
-before(function(done) {
+before(function (done) {
   const babelResult = babel.transformFileSync(
-    path.resolve(__dirname, '..', 'index.js'), {
-      presets: ['es2015']
+    path.resolve(__dirname, "..", "index.js"),
+    {
+      presets: ["@babel/preset-env"],
     }
   );
 
-  const html = path.resolve(__dirname, '..', 'index.html')
+  const html = path.resolve(__dirname, "..", "index.html");
 
-  jsdom.env(html, [], {
-    src: babelResult.code,
-    virtualConsole: jsdom.createVirtualConsole().sendTo(console)
-  }, (err, window) => {
-    if (err) {
-      return done(err);
-    }
+  const jsdomConfig = {
+    resources: "usable",
+    runScripts: "dangerously",
+  };
 
-    Object.keys(window).forEach(key => {
-      global[key] = window[key];
+  JSDOM.fromFile(html, jsdomConfig)
+    .then((jsdom) => {
+      const { window } = jsdom;
+      global.window = window;
+      global.document = window.document;
+      global.navigator = window.navigator;
+      global.console = window.console;
+      global.getComputedStyle = window.getComputedStyle;
+
+      // Babel transpile and run in the context of JSDOM
+      const script = window.document.createElement("script");
+      script.textContent = babelResult.code;
+      window.document.head.appendChild(script);
+    })
+    .then(done)
+    .catch((error) => {
+      console.error("JSDOM Error:", error);
+      done(error);
     });
-
-    return done();
-  });
 });
